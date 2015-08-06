@@ -1,0 +1,1 @@
+browserify --bare -r ksana-database -r ksana-search -r ksana-jsonrom -r ksana-analyzer -r reflux -u react-native> ksana-bundle.js
