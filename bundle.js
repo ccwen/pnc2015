@@ -1496,7 +1496,87 @@ module.exports={create:create, markupInRange:markupInRange };
 },{}],"C:\\ksana2015\\node_modules\\ksana-layer-react\\src\\typedef.js":[function(require,module,exports){
 var revision=require("./revision");
 module.exports={"rev":revision};
-},{"./revision":"C:\\ksana2015\\node_modules\\ksana-layer-react\\src\\revision\\index.js"}],"C:\\ksana2015\\node_modules\\ksana2015-segnav\\index.js":[function(require,module,exports){
+},{"./revision":"C:\\ksana2015\\node_modules\\ksana-layer-react\\src\\revision\\index.js"}],"C:\\ksana2015\\node_modules\\ksana2015-segfilter\\index.js":[function(require,module,exports){
+var React=require("react/addons");
+
+var E=React.createElement;
+var PT=React.PropTypes;
+var SegFilter=React.createClass({
+	mixins:[React.addons.PureRender]
+	,propTypes:{
+		"regex":PT.string
+		,"texts":PT.object.isRequired
+		,"onGoSegment":PT.func
+	}
+	,getInitialState:function() {
+		return {itemindex:0,texts:this.props.texts,match:[],regex:this.props.regex};
+	}
+	,componentWillMount:function() {
+		this.btn=this.props.button||"button";
+	}
+	,componentDidMount:function() {
+		this.filterSeg(this.props.regex);
+	}
+	,filterSeg:function(tofind) {
+		var regex=new RegExp( tofind,"g");
+		var hits={};
+
+		for (var id in this.state.texts) {
+			this.state.texts[id].replace(regex,function(m){
+				var idx=arguments[arguments.length-2];
+				if (!hits[id]) hits[id]=[];
+				hits[id].push( [idx,m.length]);
+			});
+		}
+		setTimeout(function(){
+			this.setState({match:Object.keys(hits), hits:hits, regex:tofind});
+			this.goSeg(0);
+		}.bind(this),100);
+	}
+	,goSeg:function(idx) {
+		var segname=this.state.match[idx];
+		this.setState({itemindex:idx});
+		this.refs.match.getDOMNode().selectedIndex=idx;
+		this.props.onGoSegment&&this.props.onGoSegment(segname,this.state.hits[segname],this.state.regex);
+	}
+	,next:function(){
+		var itemindex=this.state.itemindex;
+		if (itemindex<this.state.match.length-1) itemindex++;
+		this.goSeg(itemindex);
+	}
+	,onKeyPress:function(e) {
+		if (e.key=="Enter") {
+			this.filterSeg(e.target.value);
+		}
+	}
+	,onSelectItem:function(e) {
+		this.goSeg(e.target.selectedIndex);
+	}
+	,onChange:function(e) {
+		var regex=e.target.value;
+		clearTimeout(this.timer);
+		this.timer=setTimeout(function(){
+			this.filterSeg(regex);
+		}.bind(this),3000);
+	}
+	,renderItem:function(item,idx) {
+		return E("option",null, item);
+	}
+	,renderMatch:function() {
+			return E("select",{onChange:this.onSelectItem,style:this.props.style,ref:"match"}
+				,this.state.match.map(this.renderItem));
+	}
+	,render : function() {
+		return E("span",{}
+			,E("input",{size:6,style:this.props.style,
+					ref:"regex",defaultValue:this.state.regex,onKeyPress:this.onKeyPress,onChange:this.onChange})
+			,this.renderMatch()
+			,E(this.btn,{style:this.props.style,onClick:this.next},"↓")
+		);
+	}
+})
+module.exports=SegFilter;
+},{"react/addons":"react/addons"}],"C:\\ksana2015\\node_modules\\ksana2015-segnav\\index.js":[function(require,module,exports){
 var React=require("react/addons");
 
 var E=React.createElement;
@@ -1523,12 +1603,18 @@ var SegNav=React.createClass({
 			});
 			var segs=Object.keys(segnames);
 			var segnow=segs.indexOf(this.props.value)||0;
-			this.setState({segs:segs,segnow:segnow});
+			this.setState({segs:segs,segnow:segnow,segname:this.state.segs[segnow]});
 		}
 	}
+	,componentWillReceiveProps:function(nextProps) {
+		var idx=nextProps.segs.indexOf(nextProps.value);
+		if (idx>-1) {
+			this.setState({segnow:idx,segname:this.state.segs[idx]});
+		}
+		
+	}
 	,goSeg:function(idx) {
-		this.setState({segnow:idx});
-		this.refs.seg.getDOMNode().value=this.state.segs[idx];
+		this.setState({segnow:idx,segname:this.state.segs[idx]});
 		this.props.onGoSegment&&this.props.onGoSegment(this.state.segs[idx]);
 	}
 	,prev:function() {
@@ -1548,9 +1634,9 @@ var SegNav=React.createClass({
 		}
 	}
 	,onChange:function(e) {
-		var seg=e.target.value;
-		var idx=this.state.segs.indexOf(seg);
-
+		var segname=e.target.value;
+		var idx=this.state.segs.indexOf(segname);
+		this.setState({segname:segname});
 		clearTimeout(this.timer);
 		this.timer=setTimeout(function(){
 			if (idx>-1) this.goSeg(idx);
@@ -1560,11 +1646,10 @@ var SegNav=React.createClass({
 		}.bind(this),2000);
 	}
 	,render : function() {
-		var segname=this.state.segs[this.state.segnow];
 		return E("span",null,
-			E(this.btn,{onClick:this.prev,disabled:this.state.segnow==0},"←"),
-			E("input",{ref:"seg",defaultValue:segname,onKeyPress:this.onKeyPress,onChange:this.onChange}),
-			E(this.btn,{onClick:this.next,disabled:this.state.segnow==this.state.segs.length-1},"→")
+			E(this.btn,{style:this.props.style,onClick:this.prev,disabled:this.state.segnow==0},"←"),
+			E("input",{size:8,style:this.props.style,ref:"seg",value:this.state.segname,onKeyPress:this.onKeyPress,onChange:this.onChange}),
+			E(this.btn,{style:this.props.style,onClick:this.next,disabled:this.state.segnow==this.state.segs.length-1},"→")
 		);
 	}
 })
@@ -2184,13 +2269,20 @@ var dataset=require("dataset");
 
 var SourceText=Reflux.createStore({
 	listenables:action
-	,onFetch:function(seg,cb) {
+	,onFetch:function(seg,hits,cb) {
+		if (typeof hits=="function") {
+			cb=hits;
+			hits=null;
+		}
 		var out=dataset.jwn[seg];
-		this.trigger(out,seg);
+		this.trigger(out,seg,hits);
 		if (typeof cb=="function") out.length?cb(0):cb("not found");
 	}
 	,segments:function() {
 		return Object.keys(dataset.jwn);
+	}
+	,fetchAll:function() {
+		return dataset.jwn;
 	}
 });
 module.exports=SourceText;
@@ -2199,24 +2291,27 @@ var React=require("react");
 var E=React.createElement;
 var bs=require("react-bootstrap");
 var SegNav=require("ksana2015-segnav");
+var SegFilter=require("ksana2015-segfilter");
 var action_sourcetext=require("../actions/sourcetext");
 var store_sourcetext=require("../stores/sourcetext");
 var segs=store_sourcetext.segments();
-
+var texts=store_sourcetext.fetchAll();
 var styles={
-	controls:{fontSize:"150%"}
+	controls:{fontSize:"120%"}
 }
 
 var Controls=React.createClass({displayName: "Controls",
 	getInitialState:function() {
 		var lastseg=localStorage.getItem("pnc2015.seg")||"義因文顯-1";
-		return {seg:lastseg,editing:null}
+		var lastregex=localStorage.getItem("pnc2015.regex")||"平等";
+		return {seg:lastseg,editing:null,regex:lastregex}
 	}
-	,onGoSegment:function(segnow) {
+	,onGoSegment:function(segnow,hits,regex) {
 		this.setState({seg:segnow});
-		action_sourcetext.fetch(segnow,function(err){
+		action_sourcetext.fetch(segnow,hits,function(err){
 			if (!err) {
 				localStorage.setItem("pnc2015.seg",segnow);
+				if (regex) localStorage.setItem("pnc2015.regex",regex);
 			}
 		});
 	}
@@ -2227,7 +2322,9 @@ var Controls=React.createClass({displayName: "Controls",
 	}
 	,render:function() {
 		return E("div",{style:styles.controls}
-				,E(SegNav,{segs:segs,segpat:"(.+?-[0-9]+)",value:this.state.seg,onGoSegment:this.onGoSegment})
+				,E(SegNav,{segs:segs,segpat:"(.+?-[0-9]+)",style:{fontSize:"100%"},
+						value:this.state.seg,onGoSegment:this.onGoSegment})
+				,E(SegFilter,{texts:texts,regex:this.state.regex,style:{fontSize:"100%"},onGoSegment:this.onGoSegment})
 				,E("span")
       	, this.renderAction()
      );
@@ -2236,7 +2333,7 @@ var Controls=React.createClass({displayName: "Controls",
 //      	,E("span",{className:"pull-right"},E(LoginBox))
 
 module.exports=Controls;
-},{"../actions/sourcetext":"C:\\ksana2015\\pnc2015\\src\\actions\\sourcetext.js","../stores/sourcetext":"C:\\ksana2015\\pnc2015\\src\\stores\\sourcetext.js","ksana2015-segnav":"C:\\ksana2015\\node_modules\\ksana2015-segnav\\index.js","react":"react","react-bootstrap":"react-bootstrap"}],"C:\\ksana2015\\pnc2015\\src\\views\\texts.js":[function(require,module,exports){
+},{"../actions/sourcetext":"C:\\ksana2015\\pnc2015\\src\\actions\\sourcetext.js","../stores/sourcetext":"C:\\ksana2015\\pnc2015\\src\\stores\\sourcetext.js","ksana2015-segfilter":"C:\\ksana2015\\node_modules\\ksana2015-segfilter\\index.js","ksana2015-segnav":"C:\\ksana2015\\node_modules\\ksana2015-segnav\\index.js","react":"react","react-bootstrap":"react-bootstrap"}],"C:\\ksana2015\\pnc2015\\src\\views\\texts.js":[function(require,module,exports){
 var React=require("react");
 var E=React.createElement;
 var bs=require("react-bootstrap");
@@ -2247,10 +2344,10 @@ var store_sourcetext=require("../stores/sourcetext");
 var Texts=React.createClass({displayName: "Texts",
 	mixins:[Reflux.listenTo(store_sourcetext,"onSourceText")]
 	,getInitialState:function() {
-		return {text:"",uti:""};
+		return {text:"",uti:"",tags:[]};
 	}
-	,onSourceText:function(text,uti) {
-		this.setState({text:text,uti:uti});
+	,onSourceText:function(text,uti,hits) {
+		this.setState({text:text,uti:uti,highlights:hits});
 	}
 	,onSelectText:function() {
 		console.log(arguments);
@@ -2258,6 +2355,7 @@ var Texts=React.createClass({displayName: "Texts",
 	,renderText:function() {
 		return E(LinkView,{
 				id:this.state.uti
+				,highlights:this.state.highlights
 				,onSelectText:this.onSelectText,text:this.state.text}
 				);
 	}

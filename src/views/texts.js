@@ -8,10 +8,10 @@ var store_sourcetext=require("../stores/sourcetext");
 var Texts=React.createClass({
 	mixins:[Reflux.listenTo(store_sourcetext,"onSourceText")]
 	,getInitialState:function() {
-		return {text:"",uti:""};
+		return {text:"",uti:"",tags:[]};
 	}
-	,onSourceText:function(text,uti) {
-		this.setState({text:text,uti:uti});
+	,onSourceText:function(text,uti,hits) {
+		this.setState({text:text,uti:uti,highlights:hits});
 	}
 	,onSelectText:function() {
 		console.log(arguments);
@@ -19,6 +19,7 @@ var Texts=React.createClass({
 	,renderText:function() {
 		return E(LinkView,{
 				id:this.state.uti
+				,highlights:this.state.highlights
 				,onSelectText:this.onSelectText,text:this.state.text}
 				);
 	}
